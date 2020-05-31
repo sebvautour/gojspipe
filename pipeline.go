@@ -45,6 +45,10 @@ var ErrExecTimeout = errors.New("Script timeout exceeded")
 
 func (p *Pipeline) initScripts(initialValues ...PipelineValue) error {
 	for _, s := range p.scripts {
+		if s.init {
+			continue
+		}
+
 		s.VM.Interrupt = make(chan func(), 1)
 
 		for _, v := range initialValues {
@@ -59,6 +63,10 @@ func (p *Pipeline) initScripts(initialValues ...PipelineValue) error {
 		if err != nil {
 			return err
 		}
+		// don't need the raw script once it's run in the VM
+		s.Script = nil
+
+		s.init = true
 	}
 	return nil
 }

@@ -11,6 +11,7 @@ type Script struct {
 	Name   string
 	Script *otto.Script
 	VM     *otto.Otto
+	init   bool
 }
 
 // NewScript returns a new Script for the given source
@@ -28,6 +29,7 @@ func NewScript(filename string, src interface{}) (script *Script, err error) {
 	script = &Script{
 		Name: filename,
 		VM:   otto.New(),
+		init: false,
 	}
 
 	if src != nil {
