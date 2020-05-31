@@ -8,7 +8,7 @@ import (
 func ExampleNewPipeline() {
 	ctx := context.Background()
 
-	// Create scripts
+	// Create script one
 	scriptOne, err := NewScript("script_one", `
 	log.Println("script_one: root of script ran on pipeline init");
 
@@ -26,6 +26,7 @@ func ExampleNewPipeline() {
 		return
 	}
 
+	// Create script two
 	scriptTwo, err := NewScript("script_two", `
 	log.Println("script_two: root of script ran on pipeline init");
 
@@ -45,29 +46,16 @@ func ExampleNewPipeline() {
 	}
 
 	// Init new pipeline
-	log.Println("- NewPipeline - start")
 	p, err := NewPipeline(ctx, []*Script{scriptOne, scriptTwo}, DefaultPipeLineConfig, PipelineValue{Name: "log", Value: log.Logger{}})
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	log.Println("- NewPipeline - end")
 
-	// runn the pipeline as needed
-	log.Println("- Run - start")
+	// run the pipeline as needed
 	err = p.Run(PipelineValue{Name: "item", Value: map[string]string{"example": "example item"}})
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	log.Println("- Run - end")
-
-	log.Println("- Run - start")
-	err = p.Run(PipelineValue{Name: "item", Value: map[string]string{"example": "another example item"}})
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	log.Println("- Run - end")
-
 }

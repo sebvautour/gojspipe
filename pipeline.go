@@ -3,7 +3,6 @@ package gojspipe
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"time"
 )
@@ -59,12 +58,12 @@ func (p *Pipeline) initScripts(initialValues ...PipelineValue) error {
 			}
 		}
 
-		_, err := p.runScript(s.Script, s)
+		_, err := s.runScript(p.ctx, p.conf.ScriptTimeout, s.script)
 		if err != nil {
 			return err
 		}
 		// don't need the raw script once it's run in the VM
-		s.Script = nil
+		s.script = nil
 
 		s.init = true
 	}
@@ -87,7 +86,7 @@ func (p *Pipeline) runScripts(src interface{}, values ...PipelineValue) (err err
 			}
 		}
 
-		stop, err := p.runScript(src, s)
+		stop, err := s.runScript(p.ctx, p.conf.ScriptTimeout, src)
 		if err != nil && p.conf.ContinueOnError == false {
 			return err
 		}
@@ -102,51 +101,6 @@ func (p *Pipeline) runScripts(src interface{}, values ...PipelineValue) (err err
 
 	}
 	return nil
-}
-
-func (p *Pipeline) runScript(src interface{}, s *Script) (stop bool, err error) {
-	interruptCtx, cancelInterrupt := context.WithCancel(p.ctx)
-
-	defer func() {
-		cancelInterrupt()
-		if caught := recover(); caught != nil {
-			if caught == ErrExecTimeout {
-				err = ErrExecTimeout
-				return
-			}
-			panic(caught) // Something else happened, repanic!
-		}
-
-	}()
-
-	go p.runInterrupt(interruptCtx, s.VM.Interrupt)
-
-	v, err := s.VM.Run(src)
-	if err != nil {
-		vmctx := s.VM.Context()
-		return false, fmt.Errorf("[%v:%v:%v] %v", s.Name, vmctx.Line, vmctx.Column, err.Error())
-	}
-
-	if v.IsBoolean() {
-		vb, err := v.ToBoolean()
-		if err != nil {
-			return false, err
-		}
-		return vb, nil
-	}
-
-	return false, nil
-}
-
-func (p *Pipeline) runInterrupt(ctx context.Context, interruptCh chan func()) {
-	select {
-	case <-time.After(p.conf.ScriptTimeout):
-		interruptCh <- func() {
-			panic(ErrExecTimeout)
-		}
-	case <-ctx.Done():
-	}
-
 }
 
 // PipelineValue can be used to pass additional values accessible in the Pipeline vm
