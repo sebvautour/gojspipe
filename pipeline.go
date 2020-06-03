@@ -9,7 +9,6 @@ import (
 
 // Pipeline holds all the scripts for the processing pipeline
 type Pipeline struct {
-	ctx     context.Context
 	scripts []*Script
 	conf    PipeLineConfig
 }
@@ -17,12 +16,11 @@ type Pipeline struct {
 // NewPipeline returns a new Pipeline, which each script given initalized
 func NewPipeline(ctx context.Context, scripts []*Script, config PipeLineConfig, initialValues ...PipelineValue) (p *Pipeline, err error) {
 	p = &Pipeline{
-		ctx:     ctx,
 		conf:    config,
 		scripts: scripts,
 	}
 
-	return p, p.initScripts(initialValues...)
+	return p, p.initScripts(ctx, initialValues...)
 }
 
 // PipeLineConfig is the config params given to NewPipeline
@@ -42,7 +40,7 @@ var DefaultPipeLineConfig = PipeLineConfig{
 // ErrExecTimeout is used when a script exceeds the PipeLineConfig.ScriptTimeout param
 var ErrExecTimeout = errors.New("Script timeout exceeded")
 
-func (p *Pipeline) initScripts(initialValues ...PipelineValue) error {
+func (p *Pipeline) initScripts(ctx context.Context, initialValues ...PipelineValue) error {
 	for _, s := range p.scripts {
 		if s.init {
 			continue
@@ -58,7 +56,7 @@ func (p *Pipeline) initScripts(initialValues ...PipelineValue) error {
 			}
 		}
 
-		_, err := s.runScript(p.ctx, p.conf.ScriptTimeout, s.script)
+		_, err := s.runScript(ctx, p.conf.ScriptTimeout, s.script)
 		if err != nil {
 			return err
 		}
@@ -72,11 +70,11 @@ func (p *Pipeline) initScripts(initialValues ...PipelineValue) error {
 
 // Run executes a run() function for each script in the pipeline
 // values can be given that will be added to the Otto VM
-func (p *Pipeline) Run(values ...PipelineValue) (err error) {
-	return p.runScripts(`run()`, values...)
+func (p *Pipeline) Run(ctx context.Context, values ...PipelineValue) (err error) {
+	return p.runScripts(ctx, `run()`, values...)
 }
 
-func (p *Pipeline) runScripts(src interface{}, values ...PipelineValue) (err error) {
+func (p *Pipeline) runScripts(ctx context.Context, src interface{}, values ...PipelineValue) (err error) {
 	for _, s := range p.scripts {
 		// set values
 		for _, v := range values {
@@ -86,7 +84,7 @@ func (p *Pipeline) runScripts(src interface{}, values ...PipelineValue) (err err
 			}
 		}
 
-		stop, err := s.runScript(p.ctx, p.conf.ScriptTimeout, src)
+		stop, err := s.runScript(ctx, p.conf.ScriptTimeout, src)
 		if err != nil && p.conf.ContinueOnError == false {
 			return err
 		}

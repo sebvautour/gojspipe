@@ -53,7 +53,7 @@ func ExampleNewPipeline() {
 	}
 
 	// run the pipeline as needed
-	err = p.Run(PipelineValue{Name: "item", Value: map[string]string{"example": "example item"}})
+	err = p.Run(ctx, PipelineValue{Name: "item", Value: map[string]string{"example": "example item"}})
 	if err != nil {
 		log.Println(err)
 		return
