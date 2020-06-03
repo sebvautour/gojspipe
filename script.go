@@ -50,9 +50,12 @@ func NewScript(filename string, src interface{}) (script *Script, err error) {
 }
 
 func (s *Script) runScript(ctx context.Context, timeout time.Duration, src interface{}) (stop bool, err error) {
+	_, span := Tracer.Start(ctx, "runScript "+s.Name)
+
 	interruptCtx, cancelInterrupt := context.WithCancel(ctx)
 
 	defer func() {
+		span.End()
 		cancelInterrupt()
 		if caught := recover(); caught != nil {
 			if caught == ErrExecTimeout {

@@ -3,9 +3,17 @@ package gojspipe
 import (
 	"context"
 	"errors"
-	"log"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/api/global"
 )
+
+// Tracer is the tracer used by this package
+var Tracer = global.Tracer("pipeline")
+
+// Log is the logrus log entry used by this package
+var Log = logrus.StandardLogger().WithField("cmp", "pipeline")
 
 // Pipeline holds all the scripts for the processing pipeline
 type Pipeline struct {
@@ -50,7 +58,6 @@ func (p *Pipeline) initScripts(ctx context.Context, initialValues ...PipelineVal
 
 		for _, v := range initialValues {
 			err := s.VM.Set(v.Name, v.Value)
-			log.Println("set " + s.Name + " value " + v.Name)
 			if err != nil {
 				return errors.New("set VM value " + v.Name + ": " + err.Error())
 			}
@@ -75,6 +82,8 @@ func (p *Pipeline) Run(ctx context.Context, values ...PipelineValue) (err error)
 }
 
 func (p *Pipeline) runScripts(ctx context.Context, src interface{}, values ...PipelineValue) (err error) {
+	sctx, span := Tracer.Start(ctx, "runScripts")
+	defer span.End()
 	for _, s := range p.scripts {
 		// set values
 		for _, v := range values {
@@ -84,16 +93,19 @@ func (p *Pipeline) runScripts(ctx context.Context, src interface{}, values ...Pi
 			}
 		}
 
-		stop, err := s.runScript(ctx, p.conf.ScriptTimeout, src)
+		stop, err := s.runScript(sctx, p.conf.ScriptTimeout, src)
 		if err != nil && p.conf.ContinueOnError == false {
 			return err
 		}
+		promScriptExecutionCount.WithLabelValues(s.Name).Inc()
+
 		if err != nil && p.conf.ContinueOnError == true {
-			// log
+			Log.Warnf("script %s failed: %s", s.Name, err.Error())
 		}
 
 		if stop {
-			// log
+			promScriptReturnedFalseCount.WithLabelValues(s.Name).Inc()
+			Log.Debugf("script %s returned false, stopping pipeline", s.Name)
 			return nil
 		}
 
